@@ -1,0 +1,1159 @@
+Congfiguration Parameters
+=========================
+
+Initial @gfx dimentions: (You can change these but I'd recommend trying to maintaining the aspect ratio)
+<? ui_width = 628 ?> original = 628
+<? ui_height = 708 ?> original = 708
+
+Interpolation time (in millisectond) for parameter smoothing: (must be a positive integer)
+<? interpolation_time = 50 ?> original = 50
+
+desc:ReaDisperser
+options:no_meter
+
+slider1:frequency.slider=0.271/*130Hz*/<0,1>-Frequency
+slider2:pinch.slider=0<0,1>-Pinch
+slider3:amount.slider=0.5<0,1>-Amount
+
+<? function p(x) (printf("%d", x)) ?>
+
+
+@init
+ext_noinit = 1;
+
+// Utility Functions:
+function clip(x, a, b) ( max(a, min(b, x)); );
+function clip_this(a, b) (this = clip(this, a, b));
+function round(x) (floor(x + 0.5));
+
+// Parameter Mapping Functions:
+function map(x, x1, x2, y1, y2) (y1 + (x - x1) * (y2 - y1) / (x2 - x1)); // assume x1 != x2
+function linear_to_frequency(x) (20 * exp(x * log(1000))); // assuming 20Hz-20kHz range
+function linear_to_bandwidth(x) (0.5 + 15.5 * sqr(sqr(x))); // equiv: 0.5 + 15.5 * (x^4)
+function frequency_to_linear(x) (log(x / 20) * (1/log(1000)));
+
+// Cytomic SVF Allpass
+function allpass_process(input) instance(state1 state2) local(bp lp hp)
+(
+    hp = input - state2;
+    bp = a1 * state1 + a2 * hp;
+    lp = state2 + a2 * state1 + a3 * hp;
+    state1 = 2 * bp - state1;
+    state2 = 2 * lp - state2;
+    input + bp_multiplier * bp // allpass output
+);
+function allpass_clear_state() (this.state1 = this.state2 = 0);
+function allpass_set_coefficients()
+(
+    smoothing_accumulator = 0;
+    smoothing_increment = (1000/<?p(interpolation_time)?>) * srate_inv;
+    
+    cutoff_target = tan($pi * frequency * srate_inv);
+    damping_target = 1 / Q;
+    bp_multiplier_target = -2 * damping_target;
+    a1_target = 1 / (1 + cutoff_target * (cutoff_target + damping_target));
+    a2_target = cutoff_target * a1_target;
+    a3_target = cutoff_target * a2_target;
+    
+    cutoff_delta = (cutoff_target - cutoff) * smoothing_increment;
+    damping_delta = (damping_target - damping) * smoothing_increment;
+    bp_multiplier_delta = (bp_multiplier_target - bp_multiplier) * smoothing_increment;
+    a1_delta = (a1_target - a1) * smoothing_increment;
+    a2_delta = (a2_target - a2) * smoothing_increment;
+    a3_delta = (a3_target - a3) * smoothing_increment;
+);
+
+function update_q() (Q = linear_to_bandwidth(pinch.slider));
+function update_frequency()
+(
+    frequency = linear_to_frequency(frequency.slider);
+    frequency = min(frequency, 0.45 * srate);
+);
+function update_amount()
+(
+    amount = floor(amount.v * 32.999);
+    amount.slider = amount * (1/32);
+    last_amount != amount ?
+    (
+        last_amount > amount ?
+        (
+        <?
+            i = 1;
+            loop(32,
+                printf("amount < %d && last_amount >= %d ? (", i, i);
+                printf("filter%02dL.allpass_clear_state();", i);
+                printf("filter%02dR.allpass_clear_state();", i);
+                printf(");");
+                i += 1;
+            );
+        ?>
+        );
+        last_amount = amount;
+    );
+);
+
+// CONSTANTS AND INITIAL VALUES:
+
+
+frequency.default = frequency_to_linear(200);
+amount.default = 0.5;
+pinch.default = 0;
+
+// gfx stuff:
+
+original_width = 628;
+original_height = 708;
+aspect_ratio = original_width / original_height;
+
+// Colors:
+red_background_box.color = 0x832626;
+light_gray_background_box.color = 0x413F4A;
+graph_window.box.color = 0x2D2D2F;
+Labels.color = 0xDDDDDD;
+indicator.color = 0xCC2626;
+
+//knob colors:
+knob_gray_ring_color = 0x5C5A5B;
+knob_red_ring_color = indicator.color;
+knob_circle_color = graph_window.box.color;
+knob_marker_color = Labels.color;
+readout.color = graph_window.box.color;
+
+// Canvases:
+main_screen.canvas = -1;
+enum = 0;
+logo.canvas = enum += 1;
+graph_window.canvas = enum += 1;
+amount.canvas = enum += 1;
+pinch.canvas = enum += 1;
+Knobs.marker.canvas = enum += 1;
+Knobs.dial.canvas = enum += 1;
+bg_screen_buffer.canvas = enum += 1;
+offscreen_buffer.canvas = enum += 1;
+desaturated_screen_buffer.canvas = enum += 1;
+scratch_canvas_1 = enum += 1;
+scratch_canvas_2 = enum += 1;
+scratch_canvas_3 = enum += 1;
+
+main_screen.x = 0;
+main_screen.y = 0;
+main_screen.w = original_width;
+main_screen.h = original_height;
+
+bg_screen_buffer.x = main_screen.x;
+bg_screen_buffer.y = main_screen.y;
+bg_screen_buffer.w = main_screen.w;
+bg_screen_buffer.h = main_screen.h;
+
+offscreen_buffer.x = main_screen.x;
+offscreen_buffer.y = main_screen.y;
+offscreen_buffer.w = main_screen.w;
+offscreen_buffer.h = main_screen.h;
+
+desaturated_screen_buffer.x = main_screen.x;
+desaturated_screen_buffer.y = main_screen.y;
+desaturated_screen_buffer.w = main_screen.w;
+desaturated_screen_buffer.h = main_screen.h;
+
+red_background_box.x = main_screen.x;
+red_background_box.y = main_screen.y;
+red_background_box.w = main_screen.w;
+red_background_box.h = main_screen.h;
+    
+light_gray_background_box.x = 0;
+light_gray_background_box.y = 112;
+light_gray_background_box.w = main_screen.w;
+light_gray_background_box.h = 576;
+
+logo.x = 0;
+logo.y = 0;
+logo.scale = 0.25;
+
+graph_window.x = 36;
+graph_window.y = 132;
+graph_window.w = 556;
+graph_window.h = 300;
+
+graph_window.box.x = 0;
+graph_window.box.y = 0;
+graph_window.box.w = graph_window.w;
+graph_window.box.h = graph_window.h;
+
+
+indicator.w = 4;
+indicator.y = indicator.w;
+indicator.h = graph_window.h - 2 * indicator.w;
+
+Triangles.w = 16;
+Triangles.h = Triangles.w;
+
+indicator.left_triangle.y1 = indicator.y;
+indicator.left_triangle.y2 = indicator.left_triangle.y1 + Triangles.h;
+indicator.left_triangle.y3 = indicator.left_triangle.y1;
+indicator.left_triangle.left = 1;
+
+indicator.right_triangle.y1 = indicator.y;
+indicator.right_triangle.y2 = indicator.left_triangle.y2;
+indicator.right_triangle.y3 = indicator.right_triangle.y1;
+indicator.right_triangle.left = 0;
+
+indicator.offset = Triangles.w + 20;
+
+text_size = 58;
+readout.text_size = 44;
+logo.text_size = 80;
+Hz_label.y = 15;
+note_label.y = graph_window.h - 16 - text_size;
+
+graph.margin = 32;
+graph.y = graph.margin;
+graph.h = graph_window.h - 2 * graph.margin;
+graph.line_width = 9;
+
+graph_size = graph_window.w;
+
+Knobs.radius = 53;
+Knobs.diameter = 2 * Knobs.radius;
+Knobs.inner_radius = 33;
+Knobs.yc = 600;
+Knobs.y = Knobs.yc - Knobs.radius;
+Knobs.label_y = Knobs.yc - 102;
+
+amount.label.string = "Amount";
+amount.xc = 172;
+amount.x = amount.xc - Knobs.radius;
+
+amount.label.xc = amount.xc;
+amount.label.yc = Knobs.label_y;
+
+pinch.label.string = "Pinch";
+pinch.xc = 456;
+pinch.x = pinch.xc - Knobs.radius;
+pinch.label.xc = pinch.xc;
+pinch.label.yc = Knobs.label_y;
+
+readout.y = Knobs.y + Knobs.diameter - 7;
+readout.h = Knobs.radius + 3;
+readout.r = 7;
+readout.yc = readout.y + 0.5 * readout.h;
+
+fade_speed = 2;
+
+frequency.mouse_id = 1;
+amount.mouse_id = 2;
+pinch.mouse_id = 3;
+
+graph_buffer = 0;
+
+smoothing_accumulator = 1;
+first_gfx_init = 1;
+srate_inv = 1 / srate;
+
+function pack_version() instance (major minor patch)
+(
+    this = (major << 16) | (minor << 8) | patch;
+);
+function unpack_version() instance (major minor patch)
+(
+    major = (this >> 16) & $~8;
+    minor = (this >> 8) & $~8;
+    patch = this & $~8;
+);
+function set_version(major, minor, patch)
+(
+    this.major = major;
+    this.minor = minor;
+    this.patch = patch;
+    this.pack_version();
+);
+
+current_version.set_version(0, 1, 0);
+
+
+@serialize
+
+file_avail(0) < 0 ? // write mode:
+(
+    file_var(0, current_version);
+) :
+// read mode:
+(
+    file_var(0, saved_version);
+    saved_version.unpack_version();
+);
+
+
+@slider
+
+frequency.v = frequency.lv = frequency.slider;
+amount.v = amount.lv = amount.slider;
+pinch.v = pinch.lv = pinch.slider;
+
+srate_inv = 1 / srate;
+update_frequency();
+update_amount();
+update_q();
+
+allpass_set_coefficients();
+update_graph = 1;
+redraw = 1;
+
+
+@block
+
+srate_inv = 1 / srate;
+block_time = time_precise();
+
+
+@sample
+
+// Interpolate filter coefficients:
+smoothing_accumulator < 1 ?
+(
+    smoothing_accumulator += smoothing_increment;
+    smoothing_accumulator > 1 ?
+    (
+        smoothing_accumulator = 1;
+        cutoff = cutoff_target;
+        damping = damping_target;
+        bp_multiplier = bp_multiplier_target;
+        a1 = a1_target;
+        a2 = a2_target;
+        a3 = a3_target;
+    ) :
+    (
+        cutoff += cutoff_delta;
+        damping += damping_delta;
+        bp_multiplier += bp_multiplier_delta;
+        a1 += a1_delta;
+        a2 += a2_delta;
+        a3 += a3_delta;
+    );
+);
+
+// Apply all-pass cascade to input:
+<?
+    i = 0;
+    loop(32,
+        printf("amount > %d ? (", i);
+        i += 1;
+        printf("spl0 = filter%02dL.allpass_process(spl0);", i);
+        printf("spl1 = filter%02dR.allpass_process(spl1);", i);
+    );
+    loop(32, printf(");"); );
+?>
+
+
+@gfx <?p(ui_width)?> <?p(ui_height)?>
+
+function set_xy(x, y) (gfx_x = x; gfx_y = y;);
+function set_this_xy() (set_xy(this.x, this.y));
+function mouse_in_circle(x, y, r) (sqrt(sqr(x - mouse_x) + sqr(y - mouse_y)) <= r);
+function mouse_in_box(x,y,w,h)(x<=mouse_x && mouse_x<=x+w && y<=mouse_y && mouse_y<=y+h);
+function init_canvas() (gfx_setimgdim(this.canvas, this.w, this.h));
+function enter_canvas() (stack_push(gfx_dest); gfx_dest = this.canvas);
+function exit_canvas() (stack_pop(gfx_dest));
+function unpack_red(c) ((c >> 16) * (1/255));
+function unpack_green(c) (((c >> 8) & 0xFF) * (1/255));
+function unpack_blue(c) ((c & 0xFF) * (1/255));
+function set_color(c, a)
+(
+    gfx_r = unpack_red(c);
+    gfx_g = unpack_green(c);
+    gfx_b = unpack_blue(c);
+    gfx_a = a;
+);
+function set_color(c) (set_color(c, 1));
+function set_this_color() (set_color(this.color, 1));
+function gradient(x, y, w, h, c1, c2)
+local(r1 g1 b1 r2 g2 b2 dr dg db div)
+(
+    r1 = unpack_red(c1);
+    g1 = unpack_green(c1);
+    b1 = unpack_blue(c1);
+    r2 = unpack_red(c2);
+    g2 = unpack_green(c2);
+    b2 = unpack_blue(c2);
+    
+    div = 1 / (vertical ? h - 1 : w - 1);
+    dr = (r2 - r1) * div;
+    dg = (g2 - g1) * div;
+    db = (b2 - b1) * div;
+
+    gfx_gradrect(x,y,w,h, r1,g1,b1,1, 0,0,0,0, dr,dg,db,0);
+);
+function gradient_circle(x, y, r, color1, color2) local(d a canvas1 canvas2)
+(
+    d = 2 * r + 1;
+    canvas1 = scratch_canvas_1;
+    canvas2 = scratch_canvas_2;
+    stack_push(gfx_dest);
+    (
+        gfx_setimgdim(canvas1, d, d);
+        gfx_dest = canvas1;
+        gfx_set(0);
+        gfx_rect(0, 0, d, d);
+        gfx_set(1);
+        gfx_circle(r, r, r, 1);
+        
+        gfx_setimgdim(canvas2, d, d);
+        gfx_dest = canvas2;
+        gradient(0, 0, d, d, color1, color2);
+        
+        gfx_y = 0;
+        loop(d,
+            gfx_x = 0;
+            loop(d,
+                gfx_dest = canvas1;
+                gfx_getpixel(a, 0, 0);
+                gfx_dest = canvas2;
+                gfx_muladdrect(gfx_x,gfx_y,1,1, 1,1,1,a, 0,0,0,0);
+                gfx_x += 1;
+            );
+            gfx_y += 1;
+        );
+    );
+    stack_pop(gfx_dest);
+    
+    set_xy(x - r, y - r);
+    gfx_blit(canvas2, 1, 0);
+);
+function get_width(string) local(w h) ( gfx_measurestr(string,w,h); w; );
+function blit_this(scale)
+(
+    this.set_this_xy();
+    gfx_blit(this.canvas, scale, 0);
+);
+function rounded_rectangle(x, y, w, h, r)
+local(xr yr xh yh wr hr)
+(
+    xr = x + r;
+    yr = y + r;
+    xh = x + w - r - 1;
+    yh = y + h - r - 1;
+    wr = w - 2 * r;
+    hr = h - 2 * r;
+    
+    gfx_circle(xr, yr, r, 1);
+    gfx_circle(xr, yh, r, 1);
+    gfx_circle(xh, yr, r, 1);
+    gfx_circle(xh, yh, r, 1);
+    
+    gfx_rect(xr, y,  wr, h);
+    gfx_rect(x,  yr, w,  hr);
+);
+function draw_box() instance(color x y w h)
+(
+    set_color(color);
+    gfx_rect(x, y, w, h);
+);
+function draw_triangle() local(x4 y4) instance(x1 y1 x2 y2 x3 y3 left)
+(
+    gfx_triangle(x1, y1, x2, y2, x3, y3);
+    x4 = left ? x3 - 1 : x3 + 1;
+    y4 = y2 + 1;
+    gfx_line(x2, y4, x4, y3, 1);
+);
+
+function draw_label() instance(string)
+(
+    this.set_this_xy();
+    gfx_drawstr(string);
+    // print twice to strengthen AA edges:
+    this.set_this_xy();
+    gfx_drawstr(string);
+);
+function draw_centered_text() instance(string xc yc)
+(
+    set_xy(xc, yc);
+    gfx_drawstr(string, 261, xc, yc);
+    
+    // print twice to strengthen AA edges:
+    set_xy(xc, yc);
+    gfx_drawstr(string, 261, xc, yc);
+);
+// KNOBS:
+function draw_knob_readout(string)
+(
+    readout.xc = this.xc;
+    readout.string = string;
+    readout.w = get_width(readout.string) + 25;
+    readout.x = readout.xc - 0.5 * readout.w;
+    set_color(readout.color);
+    rounded_rectangle(readout.x, readout.y, readout.w, readout.h, readout.r);
+    set_color(Labels.color);
+    readout.draw_centered_text();
+);
+function generate_knob_marker() local(d canvas)
+(
+    stack_push(gfx_dest);
+    (
+        d = Knobs.diameter;
+        canvas = Knobs.marker.canvas;
+        gfx_setimgdim(canvas, d, d);
+        gfx_dest = canvas;
+        set_color(knob_marker_color);
+        gfx_rect(51, 30, 4, 12);
+    );
+    stack_pop(gfx_dest);
+);
+function generate_knob_dial() local(d r r2 canvas1 canvas2 a)
+(
+    d = Knobs.diameter;
+    r = Knobs.radius;
+    d = Knobs.diameter;
+    r2 = Knobs.inner_radius;
+    
+    canvas1 = Knobs.dial.canvas;
+    canvas2 = scratch_canvas_3;
+    gfx_setimgdim(canvas1, d, d);
+    gfx_setimgdim(canvas2, d, d);
+    
+    stack_push(gfx_dest);
+    (
+       
+        gfx_dest = canvas1;
+        gradient(0, r - r2, d, r2 * 2 + 1, 0x464545, 0x323131);
+        gradient_circle(r, r, r2, 0x464545, 0x323131);
+        gradient_circle(r, r, r2-2, 0x4b4a4a, 0x323131);
+        gradient_circle(r, r, r2-5, 0x403f3f, 0x333232);
+        
+        gfx_dest = canvas2;
+        gfx_set(0);
+        gfx_rect(0, 0, d, d);
+        gfx_set(1);
+        gfx_circle(r, r, r2, 1);
+        
+        gfx_y = 0;
+        loop(d,
+            gfx_x = 0;
+            loop(d,
+                gfx_dest = canvas2;
+                gfx_getpixel(a, 0, 0);
+                gfx_dest = canvas1;
+                gfx_muladdrect(gfx_x,gfx_y,1,1, 1,1,1,a, 0,0,0,0);
+                gfx_x += 1;
+            );
+            gfx_y += 1;
+        );
+    );
+    stack_pop(gfx_dest);
+);
+
+function knob_update() local(r d v tg z w h)
+(
+    r = Knobs.radius;
+    d = Knobs.diameter;
+    v = this.slider;
+    this.angle = $pi * 0.75 * (2 * v - 1);
+    tg = tan($pi * 0.25 * (5 - 6 * v));
+    z =
+      v > (2/3) ?  r * (1 - tg) :
+      v > (1/3) ?  r * (1 + 1 / tg) :
+                   r * (1 + tg);
+    
+    this.enter_canvas();
+    (
+        gfx_a2 = 0;
+        set_color(light_gray_background_box.color);
+        gfx_rect(0, 0, d + 1, d);
+        gfx_a2 = 1;
+        
+        set_color(knob_red_ring_color);
+        gfx_circle(r, r, r, 1);
+    
+        // cutouts: (lines are for AA)
+        gfx_a2 = 0;
+        gfx_triangle(r, r,  d,d ,  0.25 * r, d);
+        gfx_line(r, r, 0.25 * r, d); // bottom left AA line
+        v > (2/3) ?
+        (
+            gfx_triangle(r, r, d, d, d,z);
+            gfx_line(r, r, d, z);
+        ) :
+        v > (1/3) ?
+        (
+            gfx_triangle(r, r, d, d, d, 0);
+            gfx_triangle(r, r, d, 0, z, 0);
+            gfx_line(r, r, z, 0);
+            gfx_line(r - 1, r, z, 1);
+            gfx_line(r - 2, r, z, 2);
+        ) :
+        (
+            gfx_triangle(r, r, d, d, d, 0);
+            gfx_triangle(r, r, 0, 0, d, 0);
+            gfx_triangle(r, r, 0, 0, 0, z);
+            gfx_line(r,r, 0,z);
+            gfx_line(r,r, 1,z);
+            gfx_line(r,r, 0,z+1);
+        );
+        gfx_line(r,r, d,d);
+        gfx_a2 = 1;
+    );
+    exit_canvas();
+);
+function draw_knob() instance(x xc angle canvas) local(r r2 d y yc)
+(
+    this.knob_update();
+    
+    r = Knobs.radius;
+    d = Knobs.diameter;
+    r2 = Knobs.inner_radius;
+    y = Knobs.y;
+    yc = Knobs.yc;
+    
+    // gray ring:
+    set_color(knob_gray_ring_color);
+    gfx_circle(xc, yc, r, 1);
+      // cutout:
+      set_color(light_gray_background_box.color);
+      gfx_triangle(x+10,y+d, x+d,y+d, xc,yc);
+    
+    // red ring:
+    set_xy(x, y);
+    gfx_blit(canvas, 1, 0);
+    
+    // shadow:
+    set_color(knob_circle_color, 0.3);
+    gfx_circle(x + 61, y + 61, r2, 1); 
+    gfx_a = 1;
+    
+    // dial and marker:
+    set_xy(x, y);
+    gfx_blit(Knobs.dial.canvas, 1, 0);
+    gfx_blit(Knobs.marker.canvas, 1, angle);
+);
+function knob_listener() local(r x y dv) instance(mouse_id v lv default)
+(
+    r = this.scaled_r;
+    x = this.scaled_x;
+    y = this.scaled_y;
+    dv = 0;
+    not_hovering && mouse_drag_id == 0?
+    (
+        mouse_in_circle(x, y, r) ?
+        (
+            not_hovering = 0; 
+            mouse_double_click ?
+            (
+                v = default;
+            ) :
+            mouse_click ?
+            (
+                mouse_Alt ?
+                (
+                    v = default;
+                ) :
+                (
+                    mouse_drag_id = mouse_id;
+                    redraw = 1;
+                );
+            ) :
+            mouse_scroll ?
+            (
+                mouse_Ctrl || mouse_Shift ? mouse_scroll *= 0.25;
+                v += mouse_scroll * (1/16);
+                v.clip_this(0,1);
+            ) :
+            mouse_right_click ?
+            (
+                0;
+            );
+        );
+    );
+    mouse_drag_id == mouse_id && mouse_dy ?
+    (
+        mouse_Ctrl || mouse_Shift ? mouse_dy *= 0.1;
+        v += mouse_dy * -0.004; // mult by scale?
+        v.clip_this(0,1);
+    );
+    
+    dv = v !== lv;
+    lv = v;
+    dv
+);
+
+function frequency_slider_listener()
+local(x y w h)
+instance(mouse_id v lv default)
+(
+    x = frequency.scaled_x;
+    y = frequency.scaled_y;
+    w = frequency.scaled_w;
+    h = frequency.scaled_h;
+    frequency_hover = 0; // global, make this nicer
+    not_hovering && mouse_drag_id == 0 ?
+    (
+        mouse_in_box(x, y, w, h) ?
+        (
+            not_hovering = 0;
+            frequency_hover = 1;
+            mouse_double_click ?
+            (
+                v = default;
+            ) :
+            mouse_click ?
+            (
+                mouse_Alt ?
+                (
+                    v = default;
+                ) :
+                (
+                    mouse_drag_id = mouse_id;
+                );
+            ) :
+            mouse_scroll ?
+            (
+                mouse_scroll *= (1/32);
+                mouse_Ctrl || mouse_Shift ? mouse_scroll *= 0.05;
+                v += mouse_scroll;
+                v.clip_this(0,1);
+            ) :
+            mouse_right_click ?
+            (
+                0;
+            );
+        );
+    );
+    
+    mouse_drag_id == mouse_id && mouse_dx ?
+    (
+        mouse_Ctrl || mouse_Shift ? mouse_dx *= 0.05;
+        v += mouse_dx / w;
+        v.clip_this(0,1);
+    );
+    v !== lv ?
+    (
+        frequency.slider = v;
+        update_frequency();
+        slider_automate(frequency.slider);
+        allpass_set_coefficients();
+        update_graph = 1;
+    );
+    lv = v;
+);
+
+function render_grayscale(x, y, w, h) local(r g b k)
+(
+    gfx_y = y;
+    loop(h,
+        gfx_x = x;
+        loop(w,
+            gfx_getpixel(r, g, b);
+            k = 0.7 * r + 0.4 * g; // this mix set from trial and error
+            gfx_setpixel(k, k, k);
+            gfx_x += 1;
+        );
+        gfx_y += 1;
+    );
+);
+
+function thick_line(x1, y1, x2, y2, weight) 
+local(x y w h r dy dx)
+(
+    x = x1;
+    y = y1;
+    w = abs(x2 - x1) + 1;
+    h = abs(y2 - y1) + 1;
+    dx = sign(x2 - x1);
+    dy = sign(y2 - y1);
+    r = 0.5 * (weight - 1);
+    w > h ?
+    (
+        dy *= (h - 1) / (w - 1);
+        loop(w,
+            gfx_circle(x, round(y), r, 1);
+            x += dx;
+            y += dy;
+        );
+    ) :
+    (
+        dx *= (w - 1) / (h - 1);
+        loop(h,
+            gfx_circle(round(x), y, r, 1);
+            x += dx;
+            y += dy;
+        );
+    );
+);
+function thick_line_to(x, y, weight)
+(
+    thick_line(gfx_x, gfx_y, x, y, weight);
+    gfx_x = x;
+    gfx_y = y;
+);
+
+function fill_graph_buffer()
+local(n i f f1 f2 cutoff damping p1 p2 p3 o group_delay max_group_delay scaling_factor)
+(
+    n = graph_window.w;
+    
+    // shitty hack to get the plot to match the original:
+    f1 = frequency_to_linear(31.5);
+    f2 = frequency_to_linear(0.25 * srate) + 0.014 * pinch.slider;
+    f = map(frequency.slider, 0, 1, f1, f2);
+    f = linear_to_frequency(f);
+    cutoff = tan($pi * f * srate_inv);
+    damping = 1 / Q;
+    
+    p1 =  cutoff * damping;
+    p2 =  cutoff * cutoff;
+    p3 =  damping * damping;
+    
+    max_group_delay = 0;
+    
+    scaling_factor = 1 / (n - 1);
+    i = 0;
+    loop(n,
+        o = sqr(tan($pi * linear_to_frequency(i * scaling_factor) * srate_inv));
+        group_delay = p1 * (p2 + o) * (1 + o) / (sqr(p2 - o) + p2 * p3 * o);
+        graph_buffer[i] = group_delay;
+        max_group_delay = max(max_group_delay, group_delay);
+        i += 1;
+    );
+    
+    // Scale values such that max is 1:
+    max_group_delay > 0 ?
+    (
+        scaling_factor = 1 / max_group_delay;
+        i = 0;
+        loop(n,
+            graph_buffer[i] *= scaling_factor;
+            i += 1;
+        );
+    );
+    
+    // Scale values to pixel hights:
+    scaling_factor = 1 - (1 - amount.slider) ^ 2; // apply nice curve
+    i = 0;
+    loop(n,
+        graph_buffer[i] = round(graph.h * (1 - graph_buffer[i] * scaling_factor));
+        i += 1;
+    );
+);
+
+gfx_start_time = time_precise();
+dt = first_gfx_init ? 0 : gfx_start_time - gfx_start_time_last;
+gfx_start_time_last = gfx_start_time;
+
+
+first_gfx_init ?
+(
+    first_gfx_init = 0;
+    logo.loaded = gfx_loadimg(logo.canvas, "ReaDisperser.png") > -1;
+    graph_window.init_canvas();
+    offscreen_buffer.init_canvas();
+    desaturated_screen_buffer.init_canvas();
+    bg_screen_buffer.init_canvas();
+    gfx_setfont(2, "Roboto", readout.text_size);
+    gfx_setfont(1, "Roboto", text_size);
+    generate_knob_marker();
+    generate_knob_dial();
+    gfx_setimgdim(amount.canvas, Knobs.diameter + 1, Knobs.diameter);
+    gfx_setimgdim(pinch.canvas, Knobs.diameter + 1, Knobs.diameter);
+    
+    fadein_t = 4;
+    
+    // draw background:
+    bg_screen_buffer.enter_canvas();
+    (
+        red_background_box.draw_box();
+        light_gray_background_box.draw_box();
+        set_color(Labels.color);
+        amount.label.draw_centered_text();
+        pinch.label.draw_centered_text();
+        logo.loaded ?
+        (
+            logo.blit_this(logo.scale);
+        ) :
+        (
+            // fallback in case logo png fails to load:
+            gfx_setfont(3, "Roboto", logo.text_size);
+            set_xy(0, 0);
+            gfx_drawstr("ReaDisperser", 1+4, main_screen.w, light_gray_background_box.y);
+            gfx_setfont(1);
+        );
+    );
+    exit_canvas();
+);
+
+// Resizing Logic:
+gfx_w != last_w || gfx_h != last_h ?
+(
+    last_w = gfx_w;
+    last_h = gfx_h;
+    
+    scale = gfx_w > aspect_ratio * gfx_h ? gfx_h / original_height: gfx_w / original_width;
+    scale = max(scale, 0.25*0.75);
+    scale != last_scale ?
+    (
+        last_scale = scale;
+
+        frequency.scaled_x = round(graph_window.x * scale);
+        frequency.scaled_y = round(graph_window.y * scale);
+        frequency.scaled_w = round(graph_window.w * scale);
+        frequency.scaled_h = round(graph_window.h * scale);
+
+        amount.scaled_x = round(amount.xc * scale);
+        amount.scaled_y = round(Knobs.yc * scale);
+        amount.scaled_r = round(Knobs.radius * scale);
+
+        pinch.scaled_x = round(pinch.xc * scale);
+        pinch.scaled_y = round(Knobs.yc * scale);
+        pinch.scaled_r = round(Knobs.radius * scale);
+    );
+
+);
+
+mouse_down = mouse_cap & 1;
+mouse_click = mouse_down && !last_mouse_down;
+mouse_unclick = !mouse_down && last_mouse_down;
+last_mouse_down = mouse_down;
+
+mouse_right_down = (mouse_cap & 2) || 0;
+mouse_right_click = mouse_right_down && !last_mouse_right_down;
+last_mouse_right_down = mouse_right_down;
+
+mouse_dx = mouse_x - last_mouse_x;
+last_mouse_x = mouse_x;
+mouse_dy = mouse_y - last_mouse_y;
+last_mouse_y = mouse_y;
+mouse_double_click = 0;
+mouse_click ?
+(
+    mouse_click_time = gfx_start_time;
+    mouse_double_click = mouse_click_time - last_mouse_click_time < 0.5; // 500ms
+    last_mouse_click_time = mouse_click_time;
+);
+mouse_unclick && mouse_drag_id ?
+(
+    mouse_drag_id = 0;
+    redraw = 1;
+);
+not_hovering = 1;
+mouse_Ctrl = mouse_cap & 4 || 0;
+mouse_Shift = mouse_cap & 8 || 0;
+mouse_Alt = mouse_cap & 16 || 0;
+mouse_scroll = sign(mouse_wheel);
+mouse_wheel = 0;
+
+frequency.frequency_slider_listener();
+amount.knob_listener() ?
+(
+    update_amount();
+    slider_automate(amount.slider);
+    update_graph = 1;
+);
+pinch.knob_listener() ?
+(
+    pinch.slider = pinch.v;
+    update_q();
+    slider_automate(pinch.slider);
+    allpass_set_coefficients();
+    update_graph = 1;
+);
+
+update_graph ?
+(
+    update_graph = 0;
+    
+    graph_window.enter_canvas();
+    (
+        // graph background:
+        graph_window.box.draw_box();
+        
+        // draw graph line:
+        fill_graph_buffer();
+        set_color(indicator.color, 0.2);
+        set_xy(0, graph.y + graph_buffer[0]);
+        j = 1;
+        loop(graph_size - 1,
+            thick_line_to(gfx_x + 1, graph.y + graph_buffer[j], graph.line_width);
+            j += 1;
+        );
+        
+        // indicator line:
+        gfx_a = 0.7;
+        indicator.x = round(indicator.offset + (graph_window.w - 2 * indicator.offset) * frequency.slider);
+        indicator.draw_box();
+        
+        // indicator triangles:
+        gfx_a = 1;
+        indicator.left_triangle.x1 = indicator.x - indicator.w;
+        indicator.left_triangle.x2 = indicator.left_triangle.x1;
+        indicator.left_triangle.x3 = indicator.left_triangle.x1 - Triangles.w;
+        indicator.left_triangle.draw_triangle();
+        indicator.right_triangle.x1 = indicator.x + indicator.w + indicator.w - 1;
+        indicator.right_triangle.x2 = indicator.right_triangle.x1;
+        indicator.right_triangle.x3 = indicator.right_triangle.x1 + Triangles.w;
+        indicator.right_triangle.draw_triangle();
+        
+        // generate string for frequency (Hz) label:
+        frequency < 100   ? sprintf(#Hz_label, "%.1f Hz", frequency) :
+        frequency < 1000  ? sprintf(#Hz_label, "%d Hz", frequency) :
+        frequency < 10000 ? sprintf(#Hz_label, "%.2f kHz", frequency / 1000) :
+                            sprintf(#Hz_label, "%.1f kHz", frequency / 1000);
+        Hz_label.string = #Hz_label;
+        
+        // generate string for midi note label:
+        midi_note = round(69 + log(frequency * (1/440)) * (12/log(2)));
+        strcpy_substr(#note_label, "C C#D D#E F F#G G#A A#B ", 2 * (midi_note % 12), 2);
+        ' ' == str_getchar(#note_label, 1) ? strcpy_substr(#note_label, #note_label, 0, 1);
+        #note_label += sprintf(#, "%d", floor(midi_note * (1/12)) - 1);
+        note_label.string = #note_label;
+        
+        // place labels horizontally:
+        frequency.slider < 0.5 ?
+        (
+            Hz_label.x = indicator.x + 40;
+            note_label.x = Hz_label.x;
+        ) :
+        (
+            Hz_label.x = indicator.x - 40 - get_width(Hz_label.string);
+            note_label.x = indicator.x - 40 - get_width(note_label.string);
+        );
+        
+        // print labels:
+        set_color(Labels.color);
+        Hz_label.draw_label();
+        note_label.draw_label();
+    );
+    exit_canvas();
+    redraw = 1;
+);
+
+// detect bypass state:
+bypassed = gfx_start_time > block_time + 0.1; // trigger 100ms after @block stops running
+bypassed_trigger = bypassed && !last_bypassed;
+unbypassed_trigger = !bypassed && last_bypassed;
+last_bypassed = bypassed;
+
+bypassed_trigger ?
+(
+    // trigger fadeout animation:
+    fadeout_t = fade_alpha > 0.99 ? 0 : -log(1 - fade_alpha);
+    redraw = 1;
+    
+    // clear filter states:
+    <?
+        i = 0;
+        loop(32,
+            printf("amount > %d ? (", i);
+            i += 1;
+            printf("filter%02dL.allpass_clear_state();", i);
+            printf("filter%02dR.allpass_clear_state();", i);
+        );
+        loop(32, printf(");"); );
+    ?>
+) :
+unbypassed_trigger ?
+(
+    // trigger fadein animation:
+    fadein_t = fade_alpha > 0.99 ? 0 : -log(fade_alpha);
+);
+do_bw_effect = bypassed || fadein_t < 4;
+
+
+redraw ?
+(
+    redraw = 0;
+    offscreen_buffer.enter_canvas();
+    (
+        bg_screen_buffer.blit_this(1);
+        graph_window.blit_this(1);
+        
+        amount.draw_knob();
+        pinch.draw_knob();
+        
+        gfx_setfont(2);
+        mouse_drag_id == amount.mouse_id ?
+        (
+            sprintf(#value, "%d", amount);
+            amount.draw_knob_readout(#value);
+        ) :
+        mouse_drag_id == pinch.mouse_id ?
+        (
+            sprintf(#value, "%.2f", Q);
+            pinch.draw_knob_readout(#value);
+        );
+        gfx_setfont(1);
+    );
+    exit_canvas();
+    
+    do_bw_effect ?
+    (
+        desaturated_screen_buffer.enter_canvas();
+        (
+            offscreen_buffer.blit_this(1);
+            render_grayscale(0, 0, red_background_box.w, red_background_box.h);
+        );
+        exit_canvas();
+    );
+);
+gfx_dest = main_screen.canvas;
+set_color(graph_window.box.color);
+gfx_rect(0,0,gfx_w,gfx_h);
+offscreen_buffer.blit_this(scale);
+
+
+frequency_hover || mouse_drag_id == frequency.mouse_id ?
+    gfx_setcursor(32644) : gfx_setcursor(32512);
+
+// Bypass B&W fade:
+bypassed ?
+(
+    fade_alpha = fadeout_t < 4 ? 1 - exp(-fadeout_t) : 1;
+    fadeout_t += fade_speed * dt;
+) :
+fadein_t < 4 ?
+(
+    fade_alpha = exp(-fadein_t);
+    fadein_t += fade_speed * dt;
+);
+
+do_bw_effect ?
+(
+    gfx_a = fade_alpha;
+    desaturated_screen_buffer.blit_this(scale);
+    gfx_a = 1;
+);
+
+/*/ GFX Benchmarking: (remove before release)
+
+gfx_set(0);
+gfx_rect(0,0,64+8,22);
+
+__fps = 1 / dt;
+
+__a0 = (time_precise() - gfx_start_time) * 1000; // gfx section time in ms
+__a0_peak *= 0.95;
+__a0_peak = max(__a0_peak, __a0);
+__a0_peak2 = max(__a0_peak2 - __dp2, 0);
+__dp2 += 0.02;
+__a0_peak2 < __a0_peak ?
+(
+    __a0_peak2 = __a0_peak;
+    __dp2 = 0;
+);
+
+gfx_setfont(0);
+gfx_set(1);
+set_xy(8, 8);
+gfx_printf("%05.2fms", __a0_peak2);
+gfx_setfont(1);
+/**/
+
+/*/ "Peak Meter":
+__x = 5;
+__y = ceil(red_background_box.h * scale);
+__d = -0.03;
+gfx_set(0);
+gfx_rect(0,22,20,__y-22);
+__dy = (1 - exp(__d * __a0_peak)) * __y;
+gfx_set(1,0,0);
+gfx_rect(__x, __y - __dy, 10, __dy);
+
+__dy2 = (1 - exp(__d * __a0_peak2)) * __y;
+gfx_rect(__x, __y - __dy2, 10, 2);
+/**/
+

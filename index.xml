@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<index version="1" name="NAD JSFX">
+    <metadata>
+        <description>{\rtf1\fs24{\fs36\b NAD JSFX Repository\b}\line\line This is a collection of my JSFX audio effects.}</description>
+    </metadata>
+    <category name="Filter">
+        <reapack name="ReaDisperser" type="effect">
+            <version name="0.1.0" author="NAD" time="2026-06-21T00:00:00Z">
+                <changelog>Initial Release</changelog>
+                <source file="ReaDisperser/ReaDisperser.jsfx">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.jsfx</source>
+                <source file="ReaDisperser/ReaDisperser.png">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.png</source>
+                <source file="ReaDisperser/ReaDisperser.jsfx.rpl">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.jsfx.rpl</source>
+                <source file="ReaDisperser/Roboto.ttf">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/Roboto.ttf</source>
+                <source file="ReaDisperser/OFL.txt">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/OFL.txt</source>
+            </version>
+            <metadata>
+                <description>{\rtf1\ansi\fs24 This is a description of ReaDisperser}</description>
+            </metadata>
+        </reapack>
+    </category>
+</index>

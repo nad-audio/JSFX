@@ -14,7 +14,7 @@
                 <source file="ReaDisperser/OFL.txt">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/OFL.txt</source>
             </version>
             <metadata>
-                <description>{\rtf1\ansi\fs24\b ReaDisperser}</description>
+                <description>{\rtf1\ansi\fs24\b\qc ReaDisperser}</description>
             </metadata>
         </reapack>
     </category>

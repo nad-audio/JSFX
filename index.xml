@@ -4,7 +4,7 @@
         <description>
 <![CDATA[{\rtf1\ansi
 {\pard \qc \fs72 \sa440 \b \ul NAD JSFX Repository\par}
-{\pard \ql \fs36 \b0 This is a collection of my JSFX plugins.\par}
+{\pard \ql \fs30 \b0 This is a collection of my JSFX plugins.\par}
 }]]>
         </description>
     </metadata>
@@ -21,10 +21,12 @@
 <![CDATA[{\rtf1\ansi
 {\pard \qc \fs72 \sa440 \b ReaDisperser\par}
 {\pard \qc \fs36 \sa220 A JSFX clone of Kilohearts Disperser.\par}
-{\pard \qc \fs36 \sa440 Try it {\i today!}\par}
+{\pard \qc \fs36 \sa660 Try it {\i today!}\par}
 {\pard \ql \fs30 * Please download and install {\field{\*\fldinst{HYPERLINK "https://raw.githubusercontent.com/nad-audio/JSFX/7b03ed5e56925f3658a83a42bef53130cfb0c55a/ReaDisperser/Roboto.zip"}}{\fldrslt this font}} for best viewing experience.\par}
 }]]>
                 </description>
+                <link rel="website">https://forum.cockos.com/showthread.php?t=305713</link>
+                <link rel="screenshot">https://raw.githubusercontent.com/nad-audio/JSFX/7225784a9d9a377e4b79add6b93501ebd9948ecd/ReaDisperser/screenshot.png</link>
             </metadata>
         </reapack>
     </category>

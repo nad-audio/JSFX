@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <index version="1" name="NAD JSFX">
     <metadata>
-        <description>{\rtf1\fs24{\fs36\b NAD JSFX Repository\b}\line\line This is a collection of my JSFX audio effects.}</description>
+        <description><![CDATA[{\rtf1\ansi
+{\pard \qc \fs72 \sa440 \b \ul NAD JSFX Repository\par}
+{\pard \ql \fs36 \b0 This is a collection of my JSFX audio effect plugins.\par}
+}]]>
+        </description>
     </metadata>
     <category name="Filter">
         <reapack name="ReaDisperser" type="effect">
@@ -14,7 +18,12 @@
                 <source file="ReaDisperser/OFL.txt">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/OFL.txt</source>
             </version>
             <metadata>
-                <description>{\rtf1\ansi\b\qc\fs48 ReaDisperser}</description>
+                <description><![CDATA[{\rtf1\ansi
+{\pard \qc \fs72 \sa440 \b ReaDisperser\par}
+{\pard \qc \fs36 \sa220 A JSFX clone of Kilohearts Disperser.\par}
+{\pard \qc \fs36 Try it {\i today!}\par}
+}]]>
+                </description>
             </metadata>
         </reapack>
     </category>

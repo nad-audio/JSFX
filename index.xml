@@ -15,15 +15,14 @@
                 <source file="ReaDisperser/ReaDisperser.jsfx">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.jsfx</source>
                 <source file="ReaDisperser/ReaDisperser.png">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.png</source>
                 <source file="ReaDisperser/ReaDisperser.jsfx.rpl">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.jsfx.rpl</source>
-                <source file="ReaDisperser/Roboto.ttf">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/Roboto.ttf</source>
-                <source file="ReaDisperser/OFL.txt">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/OFL.txt</source>
             </version>
             <metadata>
                 <description>
 <![CDATA[{\rtf1\ansi
 {\pard \qc \fs72 \sa440 \b ReaDisperser\par}
 {\pard \qc \fs36 \sa220 A JSFX clone of Kilohearts Disperser.\par}
-{\pard \qc \fs36 Try it {\i today!}\par}
+{\pard \qc \fs36 \sa440 Try it {\i today!}\par}
+{\pard \ql \fs30 * Please download and install {\field{\*\fldinst{HYPERLINK "https://raw.githubusercontent.com/nad-audio/JSFX/7b03ed5e56925f3658a83a42bef53130cfb0c55a/ReaDisperser/Roboto.zip"}}{\fldrslt this font}} for best viewing experience.\par}
 }]]>
                 </description>
             </metadata>

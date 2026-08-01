@@ -875,7 +875,7 @@ last_mouse_y = mouse_y;
 mouse_double_click = 0;
 mouse_click ?
 (
-    mouse_click_time = gfx_start_time;
+    mouse_click_time = time_precise();
     mouse_double_click = mouse_click_time - last_mouse_click_time < 0.5; // 500ms
     last_mouse_click_time = mouse_click_time;
 );

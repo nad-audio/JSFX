@@ -12,7 +12,7 @@
         <reapack name="ReaDisperser" type="effect">
             <version name="0.1.0" author="NAD" time="2026-06-21T00:00:00Z">
                 <changelog>Initial Release</changelog>
-                <source file="ReaDisperser/ReaDisperser.jsfx">https://raw.githubusercontent.com/nad-audio/JSFX/6a8c5ad9225f5437b841eff1c64d4f92bf6de875/ReaDisperser/ReaDisperser.jsfx</source>
+                <source file="ReaDisperser/ReaDisperser.jsfx">https://raw.githubusercontent.com/nad-audio/JSFX/3afd8c5fb0d839e081719fcc2f2351ab55dd6a00/ReaDisperser/ReaDisperser.jsfx</source>
                 <source file="ReaDisperser/ReaDisperser.png">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.png</source>
                 <source file="ReaDisperser/ReaDisperser.jsfx.rpl">https://raw.githubusercontent.com/nad-audio/JSFX/7eb91ab084ae050be9d517861199a126bf474fb9/ReaDisperser/ReaDisperser.jsfx.rpl</source>
             </version>

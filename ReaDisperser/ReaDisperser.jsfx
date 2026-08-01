@@ -27,9 +27,7 @@ function clip_this(a, b) (this = clip(this, a, b));
 function round(x) (floor(x + 0.5));
 
 // Parameter Mapping Functions:
-function map(x, x1, x2, y1, y2) (y1 + (x - x1) * (y2 - y1) / (x2 - x1)); // assume x1 != x2
 function linear_to_frequency(x) (20 * exp(x * log(1000))); // assuming 20Hz-20kHz range
-function linear_to_bandwidth(x) (0.5 + 15.5 * sqr(sqr(x))); // equiv: 0.5 + 15.5 * (x^4)
 function frequency_to_linear(x) (log(x / 20) * (1/log(1000)));
 
 // Cytomic SVF Allpass
@@ -63,11 +61,11 @@ function allpass_set_coefficients()
     a3_delta = (a3_target - a3) * smoothing_increment;
 );
 
-function update_q() (Q = linear_to_bandwidth(pinch.slider));
+function update_q() (Q = 0.5 + 15.5 * sqr(sqr(pinch.slider)));
 function update_frequency()
 (
     frequency = linear_to_frequency(frequency.slider);
-    frequency = min(frequency, 0.45 * srate);
+    frequency = min(frequency, 0.49 * srate);
 );
 function update_amount()
 (
@@ -130,7 +128,6 @@ Knobs.marker.canvas = enum += 1;
 Knobs.dial.canvas = enum += 1;
 bg_screen_buffer.canvas = enum += 1;
 offscreen_buffer.canvas = enum += 1;
-desaturated_screen_buffer.canvas = enum += 1;
 scratch_canvas_1 = enum += 1;
 scratch_canvas_2 = enum += 1;
 scratch_canvas_3 = enum += 1;
@@ -149,11 +146,6 @@ offscreen_buffer.x = main_screen.x;
 offscreen_buffer.y = main_screen.y;
 offscreen_buffer.w = main_screen.w;
 offscreen_buffer.h = main_screen.h;
-
-desaturated_screen_buffer.x = main_screen.x;
-desaturated_screen_buffer.y = main_screen.y;
-desaturated_screen_buffer.w = main_screen.w;
-desaturated_screen_buffer.h = main_screen.h;
 
 red_background_box.x = main_screen.x;
 red_background_box.y = main_screen.y;
@@ -237,8 +229,6 @@ readout.h = Knobs.radius + 3;
 readout.r = 7;
 readout.yc = readout.y + 0.5 * readout.h;
 
-fade_speed = 2;
-
 frequency.mouse_id = 1;
 amount.mouse_id = 2;
 pinch.mouse_id = 3;
@@ -302,7 +292,6 @@ redraw = 1;
 @block
 
 srate_inv = 1 / srate;
-block_time = time_precise();
 
 
 @sample
@@ -375,7 +364,7 @@ local(r1 g1 b1 r2 g2 b2 dr dg db div)
     g2 = unpack_green(c2);
     b2 = unpack_blue(c2);
     
-    div = 1 / (vertical ? h - 1 : w - 1);
+    div = 1 / (h - 1);
     dr = (r2 - r1) * div;
     dg = (g2 - g1) * div;
     db = (b2 - b1) * div;
@@ -733,21 +722,6 @@ instance(mouse_id v lv default)
     lv = v;
 );
 
-function render_grayscale(x, y, w, h) local(r g b k)
-(
-    gfx_y = y;
-    loop(h,
-        gfx_x = x;
-        loop(w,
-            gfx_getpixel(r, g, b);
-            k = 0.7 * r + 0.4 * g; // this mix set from trial and error
-            gfx_setpixel(k, k, k);
-            gfx_x += 1;
-        );
-        gfx_y += 1;
-    );
-);
-
 function thick_line(x1, y1, x2, y2, weight) 
 local(x y w h r dy dx)
 (
@@ -784,29 +758,23 @@ function thick_line_to(x, y, weight)
 );
 
 function fill_graph_buffer()
-local(n i f f1 f2 cutoff damping p1 p2 p3 o group_delay max_group_delay scaling_factor)
+local(n i f cutoff damping cd cc dd o group_delay max_group_delay scaling_factor)
 (
     n = graph_window.w;
-    
-    // shitty hack to get the plot to match the original:
-    f1 = frequency_to_linear(31.5);
-    f2 = frequency_to_linear(0.25 * srate) + 0.014 * pinch.slider;
-    f = map(frequency.slider, 0, 1, f1, f2);
-    f = linear_to_frequency(f);
-    cutoff = tan($pi * f * srate_inv);
-    damping = 1 / Q;
-    
-    p1 =  cutoff * damping;
-    p2 =  cutoff * cutoff;
-    p3 =  damping * damping;
-    
     max_group_delay = 0;
     
-    scaling_factor = 1 / (n - 1);
-    i = 0;
-    loop(n,
-        o = sqr(tan($pi * linear_to_frequency(i * scaling_factor) * srate_inv));
-        group_delay = p1 * (p2 + o) * (1 + o) / (sqr(p2 - o) + p2 * p3 * o);
+    // Fancy Group Delay Calculations:
+    f = linear_to_frequency(frequency.slider);
+    cutoff = tan($pi * f * (1/80000)); // fixed 80kHz reference rate
+    damping = 1 / Q;
+    cd =  cutoff * damping;
+    cc =  cutoff * cutoff;
+    dd =  damping * damping;
+    scaling_factor = 1 / (n - 2 * indicator.offset);
+    loop(i = 0; n,
+        f = linear_to_frequency((i - indicator.offset - 2) * scaling_factor);
+        o = sqr(tan($pi * f * (1/80000)));
+        group_delay = cd * (cc + o) * (1 + o) / (sqr(cc - o) + cc * dd * o);
         graph_buffer[i] = group_delay;
         max_group_delay = max(max_group_delay, group_delay);
         i += 1;
@@ -816,26 +784,19 @@ local(n i f f1 f2 cutoff damping p1 p2 p3 o group_delay max_group_delay scaling_
     max_group_delay > 0 ?
     (
         scaling_factor = 1 / max_group_delay;
-        i = 0;
-        loop(n,
+        loop(i = 0; n,
             graph_buffer[i] *= scaling_factor;
             i += 1;
         );
     );
     
     // Scale values to pixel hights:
-    scaling_factor = 1 - (1 - amount.slider) ^ 2; // apply nice curve
-    i = 0;
-    loop(n,
+    scaling_factor = sqrt(amount.slider); // match original scaling
+    loop(i = 0; n,
         graph_buffer[i] = round(graph.h * (1 - graph_buffer[i] * scaling_factor));
         i += 1;
     );
 );
-
-gfx_start_time = time_precise();
-dt = first_gfx_init ? 0 : gfx_start_time - gfx_start_time_last;
-gfx_start_time_last = gfx_start_time;
-
 
 first_gfx_init ?
 (
@@ -843,7 +804,6 @@ first_gfx_init ?
     logo.loaded = gfx_loadimg(logo.canvas, "ReaDisperser.png") > -1;
     graph_window.init_canvas();
     offscreen_buffer.init_canvas();
-    desaturated_screen_buffer.init_canvas();
     bg_screen_buffer.init_canvas();
     gfx_setfont(2, "Roboto", readout.text_size);
     gfx_setfont(1, "Roboto", text_size);
@@ -851,8 +811,6 @@ first_gfx_init ?
     generate_knob_dial();
     gfx_setimgdim(amount.canvas, Knobs.diameter + 1, Knobs.diameter);
     gfx_setimgdim(pinch.canvas, Knobs.diameter + 1, Knobs.diameter);
-    
-    fadein_t = 4;
     
     // draw background:
     bg_screen_buffer.enter_canvas();
@@ -909,10 +867,6 @@ mouse_down = mouse_cap & 1;
 mouse_click = mouse_down && !last_mouse_down;
 mouse_unclick = !mouse_down && last_mouse_down;
 last_mouse_down = mouse_down;
-
-mouse_right_down = (mouse_cap & 2) || 0;
-mouse_right_click = mouse_right_down && !last_mouse_right_down;
-last_mouse_right_down = mouse_right_down;
 
 mouse_dx = mouse_x - last_mouse_x;
 last_mouse_x = mouse_x;
@@ -973,9 +927,9 @@ update_graph ?
         );
         
         // indicator line:
-        gfx_a = 0.7;
         indicator.x = round(indicator.offset + (graph_window.w - 2 * indicator.offset) * frequency.slider);
-        indicator.draw_box();
+        set_color(indicator.color, 0.7);
+        gfx_rect(indicator.x, indicator.y, indicator.w, indicator.h);
         
         // indicator triangles:
         gfx_a = 1;
@@ -998,7 +952,7 @@ update_graph ?
         // generate string for midi note label:
         midi_note = round(69 + log(frequency * (1/440)) * (12/log(2)));
         strcpy_substr(#note_label, "C C#D D#E F F#G G#A A#B ", 2 * (midi_note % 12), 2);
-        ' ' == str_getchar(#note_label, 1) ? strcpy_substr(#note_label, #note_label, 0, 1);
+        ' ' == str_getchar(#note_label, 1) ? str_setlen(#note_label, 1);
         #note_label += sprintf(#, "%d", floor(midi_note * (1/12)) - 1);
         note_label.string = #note_label;
         
@@ -1021,38 +975,6 @@ update_graph ?
     exit_canvas();
     redraw = 1;
 );
-
-// detect bypass state:
-bypassed = gfx_start_time > block_time + 0.1; // trigger 100ms after @block stops running
-bypassed_trigger = bypassed && !last_bypassed;
-unbypassed_trigger = !bypassed && last_bypassed;
-last_bypassed = bypassed;
-
-bypassed_trigger ?
-(
-    // trigger fadeout animation:
-    fadeout_t = fade_alpha > 0.99 ? 0 : -log(1 - fade_alpha);
-    redraw = 1;
-    
-    // clear filter states:
-    <?
-        i = 0;
-        loop(32,
-            printf("amount > %d ? (", i);
-            i += 1;
-            printf("filter%02dL.allpass_clear_state();", i);
-            printf("filter%02dR.allpass_clear_state();", i);
-        );
-        loop(32, printf(");"); );
-    ?>
-) :
-unbypassed_trigger ?
-(
-    // trigger fadein animation:
-    fadein_t = fade_alpha > 0.99 ? 0 : -log(fade_alpha);
-);
-do_bw_effect = bypassed || fadein_t < 4;
-
 
 redraw ?
 (
@@ -1079,81 +1001,12 @@ redraw ?
         gfx_setfont(1);
     );
     exit_canvas();
-    
-    do_bw_effect ?
-    (
-        desaturated_screen_buffer.enter_canvas();
-        (
-            offscreen_buffer.blit_this(1);
-            render_grayscale(0, 0, red_background_box.w, red_background_box.h);
-        );
-        exit_canvas();
-    );
 );
 gfx_dest = main_screen.canvas;
 set_color(graph_window.box.color);
 gfx_rect(0,0,gfx_w,gfx_h);
 offscreen_buffer.blit_this(scale);
 
-
 frequency_hover || mouse_drag_id == frequency.mouse_id ?
     gfx_setcursor(32644) : gfx_setcursor(32512);
-
-// Bypass B&W fade:
-bypassed ?
-(
-    fade_alpha = fadeout_t < 4 ? 1 - exp(-fadeout_t) : 1;
-    fadeout_t += fade_speed * dt;
-) :
-fadein_t < 4 ?
-(
-    fade_alpha = exp(-fadein_t);
-    fadein_t += fade_speed * dt;
-);
-
-do_bw_effect ?
-(
-    gfx_a = fade_alpha;
-    desaturated_screen_buffer.blit_this(scale);
-    gfx_a = 1;
-);
-
-/*/ GFX Benchmarking: (remove before release)
-
-gfx_set(0);
-gfx_rect(0,0,64+8,22);
-
-__fps = 1 / dt;
-
-__a0 = (time_precise() - gfx_start_time) * 1000; // gfx section time in ms
-__a0_peak *= 0.95;
-__a0_peak = max(__a0_peak, __a0);
-__a0_peak2 = max(__a0_peak2 - __dp2, 0);
-__dp2 += 0.02;
-__a0_peak2 < __a0_peak ?
-(
-    __a0_peak2 = __a0_peak;
-    __dp2 = 0;
-);
-
-gfx_setfont(0);
-gfx_set(1);
-set_xy(8, 8);
-gfx_printf("%05.2fms", __a0_peak2);
-gfx_setfont(1);
-/**/
-
-/*/ "Peak Meter":
-__x = 5;
-__y = ceil(red_background_box.h * scale);
-__d = -0.03;
-gfx_set(0);
-gfx_rect(0,22,20,__y-22);
-__dy = (1 - exp(__d * __a0_peak)) * __y;
-gfx_set(1,0,0);
-gfx_rect(__x, __y - __dy, 10, __dy);
-
-__dy2 = (1 - exp(__d * __a0_peak2)) * __y;
-gfx_rect(__x, __y - __dy2, 10, 2);
-/**/
 

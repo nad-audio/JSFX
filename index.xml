@@ -20,6 +20,7 @@
                 <changelog>
 <![CDATA[
 - Fixed hovered parameters jumping to max in macOS
+- Fixed mouse modifiers not being captured
 - Added parameter smoothing for amount knob (others already had it)
 ]]>
                 </changelog>
